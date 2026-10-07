@@ -52,6 +52,10 @@ legend{font-size:14px;font-weight:500;padding:0 6px}
 .desc{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);border-radius:10px;padding:10px 12px;margin-top:10px}
 .dimg{display:block;width:100%;height:auto;object-fit:contain;border-radius:12px;margin:0 0 12px;background:var(--bg)}
 #login{max-width:340px;margin:18vh auto;padding:0 20px;text-align:center}
+button.off{opacity:.45;cursor:not-allowed}button.off:hover{background:#fff}.pri.off:hover{background:var(--pri)}
+.grp{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.grp+.grp{padding-left:12px;border-left:1px solid var(--line)}
+.info{max-width:900px;margin:-6px auto 16px;padding:0 16px;text-align:center;color:var(--mute);font-size:13.5px}
+#toast{position:fixed;inset:auto auto 24px 50%;transform:translateX(-50%);margin:0;border:0;width:max-content;max-width:92vw;background:#17212b;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px}
 @media(max-width:1100px){#cols{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){#cols{grid-template-columns:1fr;padding:0 14px 40px}header{padding:10px 14px}.row2{grid-template-columns:1fr}.inl input{width:140px}}
 </style></head><body>
@@ -63,8 +67,9 @@ legend{font-size:14px;font-weight:500;padding:0 6px}
   <header><h1>🏃 Calendrier du club</h1><div id="auth"></div></header>
   <div class="bar">
     <button onclick="nav(-1)" aria-label="Mois précédent">◀</button><span id="lbl"></span><button onclick="nav(1)" aria-label="Mois suivant">▶</button>
-    <button onclick="nav(0)">Aujourd'hui</button><button id="add" class="pri" onclick="newEv()">＋ Nouvel événement</button>
+    <button onclick="nav(0)">Aujourd'hui</button><button id="add" class="pri" onclick="newEv()">Ajouter un événement</button>
   </div>
+  <p id="info" class="info"></p>
   <main id="cols"></main>
 </div>
 <dialog id="dlg"><div class="dc"><button class="x" onclick="dlg.close()" aria-label="Fermer">✕</button><div id="dcc"></div></div></dialog>
@@ -89,12 +94,24 @@ async function api(a,d={}){
   if(r.status===401&&a!=='login_global'){S.auth=false;render()}
   if(!r.ok||j.error)throw new Error(j.error||'Erreur');return j}
 async function boot(){S=await(await fetch('api.php?action=state')).json();render();if(S.auth)load()}
+const HINT='Identifiez-vous en tant qu’adhérent (Prénom Nom, en haut de la page) pour ajouter un événement ou une participation.';
+const canAct=()=>!!(S.member||S.admin);
+const offA=()=>canAct()?'':` aria-disabled="true" title="${esc(HINT)}"`,offC=()=>canAct()?'':' off';
+const hint=()=>toast(HINT);
+let tt;function toast(m){let t=$('#toast');if(!t){t=document.createElement('div');t.id='toast';t.setAttribute('popover','manual');document.body.appendChild(t)}
+  t.textContent=m;try{t.showPopover()}catch(e){}clearTimeout(tt);tt=setTimeout(()=>{try{t.hidePopover()}catch(e){}},4500)}
 function render(){$('#login').hidden=S.auth;$('#app').hidden=!S.auth;if(!S.auth)return;
-  let h='';
-  if(S.admin)h+=`<span class="pill">Admin</span><button onclick="act('logout_admin')">Quitter le mode admin</button>`;
-  if(S.member)h+=`<span>👤 <b>${esc(S.member)}</b></span><button onclick="act('logout_member')">Déconnexion adhérent</button>`;
-  else h+=`<form class="inl" onsubmit="return mlog(this)"><input type="text" name="n" placeholder="Prénom Nom" maxlength="100" autocomplete="off" required><button class="pri">Connexion adhérent</button></form>`;
-  $('#auth').innerHTML=h;$('#add').hidden=!(S.member||S.admin)}
+  const m=S.member?`<span>👤 <b>${esc(S.member)}</b></span><button onclick="act('logout_member')">Déconnexion adhérent</button>`
+    :`<form class="inl" onsubmit="return mlog(this)"><input type="text" name="n" placeholder="Prénom Nom" maxlength="100" autocomplete="off" required><button class="pri">Connexion adhérent</button></form>`;
+  const a=S.admin?`<span class="pill">Admin</span><button onclick="act('logout_admin')">Quitter le mode admin</button>`
+    :`<button onclick="adminForm()">🔑 Mode admin</button>`;
+  $('#auth').innerHTML=`<div class="grp">${m}</div><div class="grp">${a}</div>`;
+  const add=$('#add');add.classList.toggle('off',!canAct());
+  if(canAct())add.removeAttribute('aria-disabled');else add.setAttribute('aria-disabled','true');
+  add.title=canAct()?'':HINT;
+  $('#info').textContent=S.admin?'🔑 Mode admin : vous pouvez modifier et supprimer tous les éléments.'
+    :S.member?'👤 Vous pouvez modifier ou supprimer les événements que vous avez créés et les participations que vous avez ajoutées, et retirer votre propre participation.'
+    :'🔒 Mode visiteur (consultation seule). Identifiez-vous pour ajouter des événements, des participations, et modifier ce qui vous concerne.'}
 async function act(a,d){try{S={...S,...await api(a,d)};render();if(S.auth){if(a.startsWith('logout')&&dlg.open)dlg.close();load()}}catch(e){alert(e.message)}}
 const mlog=f=>(act('login_member',{name:f.n.value}),false);
 const glog=f=>(act('login_global',{password:f.p.value}),false);
@@ -120,17 +137,17 @@ function card(e){const n=e.participants.length,tip=e.participants.map(p=>`${p.na
   return `<article class="card" onclick="openEv(${e.id})"><div class="ph">${e.image?`<img src="${esc(e.image)}" alt="" loading="lazy" onerror="this.style.display='none'">`:''}${e.young.length?`<span class="yb" title="Ouvert aux jeunes : ${esc(e.young.map(y=>YNG[y]).join(', '))}">🧒 ${e.young.join(' · ')}</span>`:''}</div>
   <div class="cb"><h3>${esc(e.name)}</h3><div class="mt">📅 ${fmtS(e.date)}${e.time?' à '+esc(e.time):''}</div><div class="mt">📍 ${esc(e.place)}</div>
   <div class="chips">${discs(e).map(d=>`<span class="chip">${esc(d)}</span>`).join('')}</div><div class="mt">🏁 ${esc(e.formats)}</div>
-  <div class="ft"><span class="cnt" title="${esc(tip)}">👥 ${n} participant${n>1?'s':''}</span>${S.member||S.admin?`<button class="sm" onclick="event.stopPropagation();partForm(${e.id})">＋ Participer</button>`:''}</div></div></article>`}
+  <div class="ft"><span class="cnt" title="${esc(tip)}">👥 ${n} participant${n>1?'s':''}</span><button class="sm${offC()}"${offA()} onclick="event.stopPropagation();partForm(${e.id})">＋ Participer</button></div></div></article>`}
 
 function openEv(id){cur=id;const e=EV.find(x=>x.id===id);if(!e)return;
   $('#dcc').innerHTML=(can(e)?formHtml(e):detailHtml(e))+partsHtml(e);if(!dlg.open)dlg.showModal()}
-function newEv(){cur=null;$('#dcc').innerHTML=formHtml(null);if(!dlg.open)dlg.showModal()}
+function newEv(){if(!canAct())return hint();cur=null;$('#dcc').innerHTML=formHtml(null);if(!dlg.open)dlg.showModal()}
 function detailHtml(e){return `${e.image?`<img class="dimg" src="${esc(e.image)}" alt="" onerror="this.style.display='none'">`:''}<h2 style="margin:0">${esc(e.name)}</h2>
   <div class="mt">📅 ${fmtL(e.date)}${e.time?' à '+esc(e.time):''}</div><div class="mt">📍 ${esc(e.place)}</div>
   <div class="chips">${discs(e).map(d=>`<span class="chip">${esc(d)}</span>`).join('')}</div><div>🏁 ${esc(e.formats)}</div>
   ${e.young.length?`<p><span class="yb" style="position:static">🧒 Ouvert aux jeunes</span> ${esc(e.young.map(y=>YNG[y]+' ('+y+')').join(', '))}</p>`:''}
   ${e.site?`<p><a href="${esc(e.site)}" target="_blank" rel="noopener noreferrer">Site officiel</a></p>`:''}
-  ${e.description?`<div class="desc">${esc(e.description)}</div>`:''}<p class="hint">Créé par ${esc(e.creator)}</p>`}
+  ${e.description?`<div class="desc">${esc(e.description)}</div>`:''}<p class="hint">Créé par ${esc(e.creator)} — ${canAct()?'seul son créateur (ou un admin) peut le modifier.':'identifiez-vous pour pouvoir participer.'}</p>`}
 function formHtml(e){
   const v=e||{name:'',date:'',time:'',place:'',disciplines:[],other:'',site:'',image_url:'',formats:'',young:[],description:''};
   const mn=new Date();mn.setMonth(mn.getMonth()-1);const mx=new Date();mx.setFullYear(mx.getFullYear()+3);
@@ -171,8 +188,8 @@ async function delMonth(m,lab){if(!confirm2(`Supprimer TOUS les événements de 
 function partsHtml(e){if(!e.id)return'';
   const rows=e.participants.map(p=>{const own=S.admin||(S.member&&p.added_by===S.member),self=S.member&&p.name.trim().toLowerCase()===S.member.toLowerCase();
     return `<div class="prow"><div><b>${esc(p.name)}</b><small>${esc(p.epreuves.join(' · '))} — ajouté par ${esc(p.added_by)}</small></div>${own||self?`<span>${own?`<button class="sm" onclick="partForm(${e.id},${p.id})" aria-label="Modifier">✏️</button> `:''}<button class="sm dng" onclick="partDel(${p.id})" aria-label="Supprimer">🗑</button></span>`:''}</div>`}).join('');
-  return `<section class="parts"><h3>Participants (${e.participants.length})${S.member||S.admin?`<button class="sm" onclick="partForm(${e.id})">＋ Ajouter</button>`:''}</h3>${rows||'<p class="empty">Aucun participant pour le moment.</p>'}</section>`}
-function partForm(eid,pid){const e=EV.find(x=>x.id===eid),p=e.participants.find(x=>x.id===pid);
+  return `<section class="parts"><h3>Participants (${e.participants.length})<button class="sm${offC()}"${offA()} onclick="partForm(${e.id})">＋ Ajouter un participant</button></h3>${rows||'<p class="empty">Aucun participant pour le moment.</p>'}</section>`}
+function partForm(eid,pid){if(!canAct())return hint();const e=EV.find(x=>x.id===eid),p=e.participants.find(x=>x.id===pid);
   const opts=e.formats.split(';').map(s=>s.trim()).filter(Boolean);
   $('#d2c').innerHTML=`<form onsubmit="return partSave(event,${eid},${pid||0})"><h2 style="margin:0">${p?'Modifier la participation':'Ajouter un participant'}</h2>
   <label>Nom du participant<input type="text" name="name" maxlength="100" required value="${esc(p?p.name:(S.member||''))}"></label>
@@ -183,6 +200,10 @@ async function partSave(ev,eid,id){ev.preventDefault();const fd=new FormData(ev.
   try{await api('part_save',{event_id:eid,id,name:fd.get('name'),epreuves:ep});dlg2.close();load()}catch(e){alert(e.message)}}
 async function partDel(id){if(!confirm2('Supprimer cette participation ?'))return;
   try{await api('part_delete',{id});load()}catch(e){alert(e.message)}}
+function adminForm(){$('#d2c').innerHTML=`<form onsubmit="return adminLog(event)"><h2 style="margin:0">Mode administrateur</h2>
+  <label>Code administrateur<input type="password" name="code" required autocomplete="off" autofocus></label>
+  <div class="acts"><button type="button" onclick="dlg2.close()">Annuler</button><button class="pri">Activer</button></div></form>`;dlg2.showModal()}
+async function adminLog(ev){ev.preventDefault();try{S={...S,...await api('login_admin',{code:ev.target.code.value})};dlg2.close();render();load()}catch(e){alert(e.message)}}
 function togOther(f){f.other.hidden=![...f.querySelectorAll('[name=disc]')].some(c=>c.checked&&c.dataset.detail==='1')}
 function normFmt(raw){
   raw=raw.replace(/\s+/g,' ').replace(/^[ ;:]+|[ ;:]+$/g,'');

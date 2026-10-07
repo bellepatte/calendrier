@@ -156,6 +156,42 @@ function getEvent(int $id): array {
     return $st->fetch() ?: fail('Événement introuvable.', 404);
 }
 
+// ---------- Anti brute force (par adresse IP, stocké en base) ----------
+const LOGIN_MAX_FAILS = 10;    // échecs autorisés avant blocage
+const LOGIN_LOCK_BASE = 900;   // 1er blocage : 15 min ; doublé à chaque échec suivant (plafond 24 h)
+
+function throttleKey(string $scope): string {
+    $b = @inet_pton($_SERVER['REMOTE_ADDR'] ?? '') ?: '';
+    if (strlen($b) === 16) $b = substr($b, 0, 8);          // IPv6 : regroupement par /64
+    return $scope . ':' . bin2hex($b);
+}
+function throttleCheck(string $scope): void {                // à appeler AVANT de comparer le secret
+    $st = db()->prepare('SELECT locked_until FROM login_attempts WHERE ip_key = ?');
+    $st->execute([throttleKey($scope)]);
+    $w = (int)$st->fetchColumn() - time();
+    if ($w > 0) {
+        header('Retry-After: ' . $w);
+        fail('Trop de tentatives. Réessayez dans ' . ($w >= 120 ? ceil($w / 60) . ' minutes' : $w . ' secondes') . '.', 429);
+    }
+}
+function throttleFail(string $scope): void {
+    $k = throttleKey($scope); $t = time(); $pdo = db();
+    $pdo->prepare('INSERT INTO login_attempts (ip_key, fails, last_fail, locked_until) VALUES (?, 1, ?, 0)
+                   ON DUPLICATE KEY UPDATE fails = IF(last_fail < ?, 1, fails + 1), last_fail = ?')
+        ->execute([$k, $t, $t - 86400, $t]);
+    $st = $pdo->prepare('SELECT fails FROM login_attempts WHERE ip_key = ?'); $st->execute([$k]);
+    $f = (int)$st->fetchColumn();
+    if ($f >= LOGIN_MAX_FAILS)
+        $pdo->prepare('UPDATE login_attempts SET locked_until = ? WHERE ip_key = ?')
+            ->execute([$t + (int)min(LOGIN_LOCK_BASE * 2 ** ($f - LOGIN_MAX_FAILS), 86400), $k]);
+    if (random_int(1, 50) === 1)                             // ménage occasionnel
+        $pdo->prepare('DELETE FROM login_attempts WHERE last_fail < ? AND locked_until < ?')->execute([$t - 172800, $t]);
+    usleep(500000);                                          // ralentit aussi chaque essai
+}
+function throttleReset(string $scope): void {
+    db()->prepare('DELETE FROM login_attempts WHERE ip_key = ?')->execute([throttleKey($scope)]);
+}
+
 // ---------- Routage ----------
 $in = json_decode(file_get_contents('php://input') ?: '', true) ?: [];
 $act = (string)($_GET['action'] ?? $in['action'] ?? '');
@@ -164,8 +200,11 @@ if ($act === 'state') out(state());
 if ($post && !hash_equals($_SESSION['csrf'], $_SERVER['HTTP_X_CSRF'] ?? '')) fail('Session expirée, rechargez la page.', 403);
 
 if ($act === 'login_global') {
-    if (hash_equals(GLOBAL_PASSWORD, (string)($in['password'] ?? ''))) { session_regenerate_id(true); $_SESSION['ok'] = true; out(state()); }
-    sleep(1); fail('Mot de passe incorrect.', 401);
+    throttleCheck('g');
+    if (hash_equals(GLOBAL_PASSWORD, (string)($in['password'] ?? ''))) {
+        throttleReset('g'); session_regenerate_id(true); $_SESSION['ok'] = true; out(state());
+    }
+    throttleFail('g'); fail('Mot de passe incorrect.', 401);
 }
 if (empty($_SESSION['ok'])) fail('Accès refusé.', 401);
 
@@ -174,9 +213,14 @@ switch ($act) {
 case 'login_member':
     session_regenerate_id(true);
     $n = trim(preg_replace('/\s+/u', ' ', (string)($in['name'] ?? '')));
-    if ($n === ADMIN_CODE) { $_SESSION['admin'] = true; out(state()); }
     if (mb_strlen($n) > 100 || !preg_match("/^[\p{L}'’-]+( [\p{L}'’-]+)+$/u", $n)) fail('Saisissez votre prénom et votre nom.');
     $_SESSION['member'] = mb_convert_case($n, MB_CASE_TITLE, 'UTF-8'); out(state());
+case 'login_admin':
+    throttleCheck('a');
+    if (hash_equals(ADMIN_CODE, (string)($in['code'] ?? ''))) {
+        throttleReset('a'); session_regenerate_id(true); $_SESSION['admin'] = true; out(state());
+    }
+    throttleFail('a'); fail('Code administrateur incorrect.', 401);
 case 'logout_member': unset($_SESSION['member']); out(state());
 case 'logout_admin':  unset($_SESSION['admin']);  out(state());
 
