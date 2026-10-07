@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Calendrier du club d'athlétisme</title>
+<style>
+:root{--bg:#f5f7fa;--ink:#17212b;--mute:#6a7785;--line:#e3e8ee;--pri:#0f766e;--pri2:#e6f4f2;--dng:#d64545;--r:12px}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+[hidden]{display:none!important}
+button,input,textarea{font:inherit;color:inherit}
+button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:7px 13px;cursor:pointer}
+button:hover{background:#eef2f6}button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--pri);outline-offset:1px}
+.pri{background:var(--pri);border-color:var(--pri);color:#fff}.pri:hover{background:#0b5f58}
+.dng{color:var(--dng)}.sm{padding:3px 9px;font-size:13px}
+input[type=text],input[type=url],input[type=date],input[type=time],input[type=password],textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff}
+header{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;padding:12px 24px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+h1{font-size:1.1rem;margin:0;font-weight:650;letter-spacing:-.01em}
+#auth,.inl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.inl input{width:180px}
+.pill{background:var(--pri2);color:var(--pri);padding:2px 10px;border-radius:99px;font-weight:600;font-size:13px}
+.bar{display:flex;gap:10px;align-items:center;justify-content:center;padding:18px 16px;flex-wrap:wrap}
+#lbl{min-width:230px;text-align:center;font-weight:600}
+#cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px;padding:0 24px 48px;align-items:start}
+.month h2{display:flex;justify-content:space-between;align-items:center;font-size:1rem;margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid var(--pri);text-transform:capitalize}
+.empty{color:var(--mute);font-size:14px;margin:6px 0}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:14px;cursor:pointer;transition:box-shadow .15s}
+.card:hover{box-shadow:0 6px 18px rgba(23,33,43,.09)}
+.ph{position:relative;aspect-ratio:16/8;background:linear-gradient(135deg,#d7ebe8,#eef3f8)}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.yb{position:absolute;top:8px;right:8px;background:#f59e0b;color:#fff;font-weight:700;font-size:12px;padding:2px 9px;border-radius:99px}
+.cb{padding:12px 14px}.cb h3{margin:0 0 4px;font-size:1rem;overflow-wrap:anywhere}
+.mt{color:var(--mute);font-size:13.5px;overflow-wrap:anywhere}
+.chips{display:flex;gap:5px;flex-wrap:wrap;margin:6px 0}
+.chip{background:var(--pri2);color:var(--pri);border-radius:99px;padding:1px 9px;font-size:12.5px}
+.ft{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+.cnt{font-size:13.5px;cursor:help;border-bottom:1px dotted var(--mute)}
+dialog{border:0;border-radius:16px;padding:0;width:min(680px,94vw);max-height:92vh;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(15,23,32,.45)}
+.dc{padding:22px;position:relative}.x{position:absolute;top:10px;right:12px;border:0;background:none;font-size:20px}
+label{display:block;margin:10px 0 0;font-weight:500;font-size:14px}
+label input,label textarea{margin-top:4px;font-weight:400}
+fieldset{border:1px solid var(--line);border-radius:10px;margin:12px 0 0;padding:6px 12px 10px}
+legend{font-size:14px;font-weight:500;padding:0 6px}
+.ck{display:inline-flex;gap:6px;align-items:center;margin:4px 14px 0 0;font-weight:400}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.hint{font-size:12.5px;color:var(--mute);margin-top:3px}
+.acts{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}.acts .dng{margin-right:auto}
+.parts{border-top:1px solid var(--line);margin-top:22px;padding-top:12px}
+.parts h3{display:flex;justify-content:space-between;align-items:center;margin:0 0 8px;font-size:1rem}
+.prow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
+.prow small{display:block;color:var(--mute)}
+.desc{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);border-radius:10px;padding:10px 12px;margin-top:10px}
+.dimg{display:block;width:100%;height:auto;object-fit:contain;border-radius:12px;margin:0 0 12px;background:var(--bg)}
+#login{max-width:340px;margin:18vh auto;padding:0 20px;text-align:center}
+@media(max-width:1100px){#cols{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){#cols{grid-template-columns:1fr;padding:0 14px 40px}header{padding:10px 14px}.row2{grid-template-columns:1fr}.inl input{width:140px}}
+</style></head><body>
+<div id="login" hidden>
+  <h1>🏃 Calendrier du club</h1><p class="mt">Saisissez le mot de passe du club.</p>
+  <form onsubmit="return glog(this)"><input type="password" name="p" placeholder="Mot de passe" required autofocus><div class="acts"><button class="pri" style="width:100%">Accéder au calendrier</button></div></form>
+</div>
+<div id="app" hidden>
+  <header><h1>🏃 Calendrier du club</h1><div id="auth"></div></header>
+  <div class="bar">
+    <button onclick="nav(-1)" aria-label="Mois précédent">◀</button><span id="lbl"></span><button onclick="nav(1)" aria-label="Mois suivant">▶</button>
+    <button onclick="nav(0)">Aujourd'hui</button><button id="add" class="pri" onclick="newEv()">＋ Nouvel événement</button>
+  </div>
+  <main id="cols"></main>
+</div>
+<dialog id="dlg"><div class="dc"><button class="x" onclick="dlg.close()" aria-label="Fermer">✕</button><div id="dcc"></div></div></dialog>
+<dialog id="dlg2"><div class="dc" id="d2c"></div></dialog>
+<script>
+const YNG={EA:'Éveil Athlétique',PO:'Poussins',BE:'Benjamins',MI:'Minimes'};
+let S={},off=0,EV=[],DL=[],cur=null,BASE=new Date();
+const $=s=>document.querySelector(s),dlg=$('#dlg'),dlg2=$('#dlg2');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const ymd=s=>{const[a,b,c]=s.split('-');return new Date(+a,+b-1,+c)};
+const fmtS=s=>ymd(s).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
+const fmtL=s=>ymd(s).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+const can=e=>S.admin||(S.member&&e.creator===S.member);
+const confirm2=m=>confirm(m)&&confirm('Dernière confirmation — '+m+'\nCette action est irréversible.');
+dlg.addEventListener('close',()=>cur=null);
+[dlg,dlg2].forEach(d=>d.addEventListener('click',ev=>{if(ev.target===d)d.close()}));
+
+async function api(a,d={}){
+  const r=await fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF':S.csrf||''},body:JSON.stringify({action:a,...d})});
+  const j=await r.json().catch(()=>({error:'Réponse invalide du serveur'}));
+  if(r.status===401&&a!=='login_global'){S.auth=false;render()}
+  if(!r.ok||j.error)throw new Error(j.error||'Erreur');return j}
+async function boot(){S=await(await fetch('api.php?action=state')).json();render();if(S.auth)load()}
+function render(){$('#login').hidden=S.auth;$('#app').hidden=!S.auth;if(!S.auth)return;
+  let h='';
+  if(S.admin)h+=`<span class="pill">Admin</span><button onclick="act('logout_admin')">Quitter le mode admin</button>`;
+  if(S.member)h+=`<span>👤 <b>${esc(S.member)}</b></span><button onclick="act('logout_member')">Déconnexion adhérent</button>`;
+  else h+=`<form class="inl" onsubmit="return mlog(this)"><input type="text" name="n" placeholder="Prénom Nom" maxlength="100" autocomplete="off" required><button class="pri">Connexion adhérent</button></form>`;
+  $('#auth').innerHTML=h;$('#add').hidden=!(S.member||S.admin)}
+async function act(a,d){try{S={...S,...await api(a,d)};render();if(S.auth){if(a.startsWith('logout')&&dlg.open)dlg.close();load()}}catch(e){alert(e.message)}}
+const mlog=f=>(act('login_member',{name:f.n.value}),false);
+const glog=f=>(act('login_global',{password:f.p.value}),false);
+function nav(n){off=n?off+n:0;load()}
+
+async function load(){
+  const b=new Date();b.setDate(1);b.setMonth(b.getMonth()+off);BASE=b;
+  const e=new Date(b.getFullYear(),b.getMonth()+4,0);
+  const r=await fetch(`api.php?action=events&from=${iso(b)}&to=${iso(e)}`);
+  if(r.status===401){S.auth=false;return render()}
+  if(!r.ok)return alert((await r.json()).error||'Erreur de chargement');
+  const j=await r.json();EV=j.events;DL=j.disciplines;draw();
+  if(cur){EV.some(x=>x.id===cur)?openEv(cur):dlg.close()}}
+function draw(){
+  const f=d=>d.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  $('#lbl').textContent=f(BASE)+' – '+f(new Date(BASE.getFullYear(),BASE.getMonth()+3,1));
+  let h='';
+  for(let i=0;i<4;i++){const d=new Date(BASE.getFullYear(),BASE.getMonth()+i,1),key=iso(d).slice(0,7),lab=f(d),l=EV.filter(e=>e.date.startsWith(key));
+    h+=`<section class="month"><h2><span>${lab}</span>${S.admin&&l.length?`<button class="sm dng" onclick="delMonth('${key}','${lab}')">Vider le mois</button>`:''}</h2>${l.map(card).join('')||'<p class="empty">Aucun événement ce mois-ci.</p>'}</section>`}
+  $('#cols').innerHTML=h}
+const discs=e=>e.disciplines.map(d=>d.detail&&e.other?d.name+' : '+e.other:d.name);
+function card(e){const n=e.participants.length,tip=e.participants.map(p=>`${p.name} — ${p.epreuves.join(', ')}`).join('\n')||'Aucun participant';
+  return `<article class="card" onclick="openEv(${e.id})"><div class="ph">${e.image?`<img src="${esc(e.image)}" alt="" loading="lazy" onerror="this.style.display='none'">`:''}${e.young.length?`<span class="yb" title="Ouvert aux jeunes : ${esc(e.young.map(y=>YNG[y]).join(', '))}">🧒 ${e.young.join(' · ')}</span>`:''}</div>
+  <div class="cb"><h3>${esc(e.name)}</h3><div class="mt">📅 ${fmtS(e.date)}${e.time?' à '+esc(e.time):''}</div><div class="mt">📍 ${esc(e.place)}</div>
+  <div class="chips">${discs(e).map(d=>`<span class="chip">${esc(d)}</span>`).join('')}</div><div class="mt">🏁 ${esc(e.formats)}</div>
+  <div class="ft"><span class="cnt" title="${esc(tip)}">👥 ${n} participant${n>1?'s':''}</span>${S.member||S.admin?`<button class="sm" onclick="event.stopPropagation();partForm(${e.id})">＋ Participer</button>`:''}</div></div></article>`}
+
+function openEv(id){cur=id;const e=EV.find(x=>x.id===id);if(!e)return;
+  $('#dcc').innerHTML=(can(e)?formHtml(e):detailHtml(e))+partsHtml(e);if(!dlg.open)dlg.showModal()}
+function newEv(){cur=null;$('#dcc').innerHTML=formHtml(null);if(!dlg.open)dlg.showModal()}
+function detailHtml(e){return `${e.image?`<img class="dimg" src="${esc(e.image)}" alt="" onerror="this.style.display='none'">`:''}<h2 style="margin:0">${esc(e.name)}</h2>
+  <div class="mt">📅 ${fmtL(e.date)}${e.time?' à '+esc(e.time):''}</div><div class="mt">📍 ${esc(e.place)}</div>
+  <div class="chips">${discs(e).map(d=>`<span class="chip">${esc(d)}</span>`).join('')}</div><div>🏁 ${esc(e.formats)}</div>
+  ${e.young.length?`<p><span class="yb" style="position:static">🧒 Ouvert aux jeunes</span> ${esc(e.young.map(y=>YNG[y]+' ('+y+')').join(', '))}</p>`:''}
+  ${e.site?`<p><a href="${esc(e.site)}" target="_blank" rel="noopener noreferrer">Site officiel</a></p>`:''}
+  ${e.description?`<div class="desc">${esc(e.description)}</div>`:''}<p class="hint">Créé par ${esc(e.creator)}</p>`}
+function formHtml(e){
+  const v=e||{name:'',date:'',time:'',place:'',disciplines:[],other:'',site:'',image_url:'',formats:'',young:[],description:''};
+  const mn=new Date();mn.setMonth(mn.getMonth()-1);const mx=new Date();mx.setFullYear(mx.getFullYear()+3);
+  const lim=e?'':`min="${iso(mn)}" max="${iso(mx)}"`;
+  const blocked=e&&!S.admin&&e.participants.some(p=>p.added_by!==S.member);
+  return `<form onsubmit="return save(event,${e?e.id:0})">${e&&e.image?`<img class="dimg" src="${esc(e.image)}" alt="" onerror="this.style.display='none'">`:''}<h2 style="margin:0">${e?'Modifier l’événement':'Nouvel événement'}</h2>
+  <label>Nom de l'événement *<input type="text" name="name" maxlength="50" required value="${esc(v.name)}"></label>
+  <div class="row2"><label>Date *<input type="date" name="date" required ${lim} value="${esc(v.date)}"></label><label>Heure<input type="time" name="time" value="${esc(v.time)}"></label></div>
+  <label>Lieu *<input type="text" name="place" maxlength="50" required value="${esc(v.place)}"></label>
+  <fieldset><legend>Discipline(s) *</legend>${DL.map(d=>`<label class="ck"><input type="checkbox" name="disc" value="${d.id}" data-detail="${d.detail?1:0}" ${v.disciplines.some(x=>x.id===d.id)?'checked':''} onchange="togOther(this.form)"> ${esc(d.name)}</label>`).join('')}
+  <input type="text" name="other" maxlength="50" placeholder="Précisez la discipline" value="${esc(v.other)}" ${v.disciplines.some(x=>x.detail)?'':'hidden'} style="margin-top:8px"></fieldset>
+  <label>Distances / épreuves / formats *<input type="text" name="formats" maxlength="100" required value="${esc(v.formats)}" oninput="fmtHint(this)" placeholder="10km ; marathon ; relais ; saut en hauteur"></label>
+  <div class="hint" id="fh">Séparez par « ; » ou « : ». Les saisies sont conservées telles quelles (sauf marathon et semi-marathon).</div>
+  <fieldset><legend>Catégories jeunes</legend>${Object.entries(YNG).map(([k,n])=>`<label class="ck"><input type="checkbox" name="young" value="${k}" ${v.young.includes(k)?'checked':''}> ${n} (${k})</label>`).join('')}</fieldset>
+  <label>Site officiel<input type="url" name="site" maxlength="1024" placeholder="https://" value="${esc(v.site)}"></label>
+  <label>Lien de l'image d'illustration<input type="url" name="image_url" maxlength="1024" placeholder="https://" value="${esc(v.image_url)}"></label>
+  <div class="hint">Si vide : image du site officiel, sinon image par défaut selon la discipline.</div>
+  <label>Description<textarea name="description" rows="6" maxlength="10000">${esc(v.description)}</textarea></label>
+  <div class="acts">${e?`<button type="button" class="dng" ${blocked?'disabled title="Des participations d’autres adhérents existent : seul un admin peut supprimer."':''} onclick="evDel(${e.id})">Supprimer</button>`:''}
+  <button type="button" onclick="dlg.close()">Annuler</button><button class="pri">${e?'Enregistrer les modifications':'Créer l’événement'}</button></div></form>`}
+async function save(ev,id){ev.preventDefault();const fd=new FormData(ev.target),g=k=>(fd.get(k)||'').toString();
+  const d={id,disciplines:fd.getAll('disc').map(Number),young:fd.getAll('young')};
+  ['name','date','time','place','other','site','image_url','formats','description'].forEach(k=>d[k]=g(k));
+  if(!d.disciplines.length)return alert('Choisissez au moins une discipline.');
+  if([...ev.target.querySelectorAll('[name=disc]')].some(c=>c.checked&&c.dataset.detail==='1')&&!d.other.trim())return alert('Précisez la discipline.');
+  const nf=normFmt(d.formats);if(nf.err)return alert(nf.err);
+  const old=id?EV.find(x=>x.id===id):null;
+  if(!old||old.date!==d.date){const mn=new Date();mn.setMonth(mn.getMonth()-1);const mx=new Date();mx.setFullYear(mx.getFullYear()+3);
+    if(d.date<iso(mn)||d.date>iso(mx))return alert('Date hors limites : de 1 mois dans le passé à 3 ans dans le futur.')}
+  if(id&&!confirm('Enregistrer les modifications ?'))return;
+  const btn=ev.target.querySelector('.pri');btn.disabled=true;btn.textContent='Enregistrement…';
+  try{await api('event_save',d);dlg.close();load()}catch(e){alert(e.message);btn.disabled=false;btn.textContent='Réessayer'}}
+async function evDel(id){if(!confirm2('Supprimer cet événement et toutes ses participations ?'))return;
+  try{await api('event_delete',{id});dlg.close();load()}catch(e){alert(e.message)}}
+async function delMonth(m,lab){if(!confirm2(`Supprimer TOUS les événements de ${lab} ?`))return;
+  try{const r=await api('month_delete',{month:m});alert(r.deleted+' événement(s) supprimé(s).');load()}catch(e){alert(e.message)}}
+
+function partsHtml(e){if(!e.id)return'';
+  const rows=e.participants.map(p=>{const own=S.admin||(S.member&&p.added_by===S.member),self=S.member&&p.name.trim().toLowerCase()===S.member.toLowerCase();
+    return `<div class="prow"><div><b>${esc(p.name)}</b><small>${esc(p.epreuves.join(' · '))} — ajouté par ${esc(p.added_by)}</small></div>${own||self?`<span>${own?`<button class="sm" onclick="partForm(${e.id},${p.id})" aria-label="Modifier">✏️</button> `:''}<button class="sm dng" onclick="partDel(${p.id})" aria-label="Supprimer">🗑</button></span>`:''}</div>`}).join('');
+  return `<section class="parts"><h3>Participants (${e.participants.length})${S.member||S.admin?`<button class="sm" onclick="partForm(${e.id})">＋ Ajouter</button>`:''}</h3>${rows||'<p class="empty">Aucun participant pour le moment.</p>'}</section>`}
+function partForm(eid,pid){const e=EV.find(x=>x.id===eid),p=e.participants.find(x=>x.id===pid);
+  const opts=e.formats.split(';').map(s=>s.trim()).filter(Boolean);
+  $('#d2c').innerHTML=`<form onsubmit="return partSave(event,${eid},${pid||0})"><h2 style="margin:0">${p?'Modifier la participation':'Ajouter un participant'}</h2>
+  <label>Nom du participant<input type="text" name="name" maxlength="100" required value="${esc(p?p.name:(S.member||''))}"></label>
+  <fieldset><legend>Épreuve(s) *</legend>${opts.map(o=>`<label class="ck"><input type="checkbox" name="ep" value="${esc(o)}" ${p&&p.epreuves.includes(o)?'checked':''}> ${esc(o)}</label>`).join('')}</fieldset>
+  <div class="acts"><button type="button" onclick="dlg2.close()">Annuler</button><button class="pri">Enregistrer</button></div></form>`;dlg2.showModal()}
+async function partSave(ev,eid,id){ev.preventDefault();const fd=new FormData(ev.target),ep=fd.getAll('ep');
+  if(!ep.length)return alert('Choisissez au moins une épreuve.');
+  try{await api('part_save',{event_id:eid,id,name:fd.get('name'),epreuves:ep});dlg2.close();load()}catch(e){alert(e.message)}}
+async function partDel(id){if(!confirm2('Supprimer cette participation ?'))return;
+  try{await api('part_delete',{id});load()}catch(e){alert(e.message)}}
+function togOther(f){f.other.hidden=![...f.querySelectorAll('[name=disc]')].some(c=>c.checked&&c.dataset.detail==='1')}
+function normFmt(raw){
+  raw=raw.replace(/\s+/g,' ').replace(/^[ ;:]+|[ ;:]+$/g,'');
+  if(!raw)return{err:'Saisissez au moins une distance, épreuve ou format.'};
+  const parts=raw.split(/[;:]/),seen=new Set(),o=[];
+  if(parts.length>20)return{err:'20 éléments maximum.'};
+  for(let t of parts){
+    t=t.trim().replace(/^[ ,.\-\/+]+|[ ,.\-\/+]+$/g,'');
+    if(!t)return{err:'Élément vide : vérifiez les séparateurs « ; » et « : ».'};
+    if(t.length>50)return{err:`« ${t} » est trop long (50 caractères max).`};
+    if(!/^[\p{L}\p{N} ,.'’()\/+×°-]+$/u.test(t)||!/[\p{L}\p{N}]/u.test(t))return{err:`Caractère non autorisé dans « ${t} ».`};
+    if((t.match(/\(/g)||[]).length!==(t.match(/\)/g)||[]).length)return{err:`Parenthèses non appariées dans « ${t} ».`};
+    if(/[,.'’\/+-]{2,}/.test(t))return{err:`Ponctuation répétée dans « ${t} ».`};
+    const k=t.toLowerCase().replace(/,/g,'.');
+    if(/^(42\.195)(\s*km)?$|^marathon$/.test(k))t='Marathon';
+    else if(/^(21\.1|21\.0975|21\.195)(\s*km)?$|^(semi|demi)[\s-]*(marathon)?$|^1\/2[\s-]*marathon$/.test(k))t='Semi-marathon';
+    else t=t.replace(/\./g,',');
+    const key=t.toLowerCase().replace(/\s+/g,'');if(seen.has(key))continue;seen.add(key);o.push(t)}
+  const v=o.join(' ; ');return v.length>100?{err:'100 caractères max après normalisation.'}:{v}}
+function fmtHint(i){const r=normFmt(i.value),h=$('#fh');
+  if(!i.value.trim()){h.textContent='Séparez par « ; » ou « : ».';h.style.color='';return}
+  h.textContent=r.err?'⚠️ '+r.err:'Sera enregistré : '+r.v;h.style.color=r.err?'var(--dng)':''}
+boot();
+</script></body></html>
