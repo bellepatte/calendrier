@@ -14,17 +14,49 @@ header('X-Content-Type-Options: nosniff');
 $_SESSION['csrf'] ??= bin2hex(random_bytes(16));
 
 const YOUNG = ['EA','PO','BE','MI'];
+const YNAMES = ['EA' => ['eveil'], 'PO' => ['poussins'], 'BE' => ['benjamins'], 'MI' => ['minimes']];
+if (!defined('DB_PREFIX')) define('DB_PREFIX', 'CALENDRIERCLUB_');   // surchargeable dans config.php
+
+/** PDO qui préfixe automatiquement les 5 tables de l'application (FROM / JOIN / INTO / UPDATE). */
+final class PrefixedPDO extends PDO {
+    private static function px(string $sql): string {
+        return preg_replace('/\b(FROM|JOIN|INTO|UPDATE|TABLE)\s+(disciplines|events|event_disciplines|participants|login_attempts)\b/i',
+                            '$1 `' . DB_PREFIX . '$2`', $sql);
+    }
+    public function prepare(string $query, array $options = []): PDOStatement|false { return parent::prepare(self::px($query), $options); }
+    public function query(string $query, ?int $fetchMode = null, mixed ...$args): PDOStatement|false {
+        return $fetchMode === null ? parent::query(self::px($query)) : parent::query(self::px($query), $fetchMode, ...$args);
+    }
+}
 
 function out($d, int $c = 200) { http_response_code($c); echo json_encode($d, JSON_UNESCAPED_UNICODE); exit; }
 function fail(string $m, int $c = 400) { out(['error' => $m], $c); }
 function db(): PDO {
     static $p;
-    return $p ??= new PDO('mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4', DB_USER, DB_PASS,
+    return $p ??= new PrefixedPDO('mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4', DB_USER, DB_PASS,
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
 }
 function state(): array {
     return ['auth' => !empty($_SESSION['ok']), 'member' => $_SESSION['member'] ?? null,
             'admin' => !empty($_SESSION['admin']), 'csrf' => $_SESSION['csrf']];
+}
+function sameName(string $a, string $b): bool {
+    $n = fn($x) => mb_strtolower(trim(preg_replace('/\s+/u', ' ', $x)));
+    return $n($a) === $n($b);
+}
+function foldStr(string $s): string {
+    return strtr(mb_strtolower($s), ['é'=>'e','è'=>'e','ê'=>'e','ë'=>'e','à'=>'a','â'=>'a','î'=>'i','ï'=>'i','ô'=>'o','û'=>'u','ù'=>'u','ü'=>'u','ç'=>'c']);
+}
+/** Catégories jeunes désignées par un mot de recherche (« poussins », « EA », « jeunes »…). */
+function youngCodes(string $term): array {
+    $t = foldStr($term);
+    if (mb_strlen($t) >= 5 && str_starts_with('jeunes', $t)) return YOUNG;
+    $o = [];
+    foreach (YNAMES as $c => $words) {
+        if ($t === strtolower($c)) { $o[] = $c; continue; }
+        if (mb_strlen($t) >= 3) foreach ($words as $w) if (str_starts_with($w, $t)) { $o[] = $c; break; }
+    }
+    return $o;
 }
 function ctl(string $s): string { return trim(preg_replace('/\p{C}+/u', ' ', $s)); }
 
@@ -247,18 +279,25 @@ case 'events':
 
 case 'search':
     $q = ctl((string)($_GET['q'] ?? ''));
+    $q = preg_replace('/[eé]veil\s+athl[eé]tique/iu', 'éveil', $q);
     $terms = array_slice(array_values(array_filter(preg_split('/\s+/u', $q), fn($t) => mb_strlen($t) >= 2)), 0, 5);
     if (!$terms || mb_strlen($q) > 60) fail('Saisissez au moins 2 caractères (60 maximum).');
     $cond = []; $par = [];
     foreach ($terms as $t) {
+        if (mb_strlen($t) === 2 && in_array(strtoupper($t), YOUNG, true)) {   // code catégorie (EA, PO, BE, MI) : uniquement la catégorie
+            $cond[] = 'FIND_IN_SET(?, e.young) > 0'; $par[] = strtoupper($t); continue;
+        }
+        $codes = youngCodes($t); $yc = '';
+        foreach ($codes as $c) $yc .= ' OR FIND_IN_SET(?, e.young) > 0';
         $a = '%' . addcslashes($t, '%_\\') . '%';                                          // texte libre
         $b = '%' . addcslashes(str_replace([' ', '.'], ['', ','], $t), '%_\\') . '%';     // distances : "10.5km" = "10,5 km"
         $cond[] = "(e.name LIKE ? COLLATE utf8mb4_unicode_ci OR e.place LIKE ? COLLATE utf8mb4_unicode_ci OR e.other LIKE ? COLLATE utf8mb4_unicode_ci
             OR REPLACE(e.formats, ' ', '') LIKE ? COLLATE utf8mb4_unicode_ci
             OR EXISTS (SELECT 1 FROM event_disciplines ed JOIN disciplines d ON d.id = ed.discipline_id WHERE ed.event_id = e.id AND d.name LIKE ? COLLATE utf8mb4_unicode_ci)
             OR EXISTS (SELECT 1 FROM participants p WHERE p.event_id = e.id AND (p.name LIKE ? COLLATE utf8mb4_unicode_ci
-                 OR REPLACE(CAST(p.epreuves AS CHAR), ' ', '') LIKE ? COLLATE utf8mb4_unicode_ci)))";
+                 OR REPLACE(CAST(p.epreuves AS CHAR), ' ', '') LIKE ? COLLATE utf8mb4_unicode_ci))" . $yc . ")";
         array_push($par, $a, $a, $a, $b, $a, $a, $b);
+        foreach ($codes as $c) $par[] = $c;
     }
     $today = date('Y-m-d');
     $st = db()->prepare('SELECT e.* FROM events e WHERE ' . implode(' AND ', $cond) . ' ORDER BY e.jour < ?, ABS(DATEDIFF(e.jour, ?)), e.id LIMIT 101');
@@ -315,12 +354,14 @@ case 'month_delete':
 case 'part_save':
     if (!$me && !$admin) fail('Connexion adhérent requise.', 403);
     $ev = getEvent((int)($in['event_id'] ?? 0)); $pid = (int)($in['id'] ?? 0);
-    $name = ctl((string)($in['name'] ?? '')); if ($name === '' || mb_strlen($name) > 100) fail('Nom du participant obligatoire (100 caractères max).');
+    $name = preg_replace('/\s+/u', ' ', ctl((string)($in['name'] ?? ''))); if ($name === '' || mb_strlen($name) > 100) fail('Nom du participant obligatoire (100 caractères max).');
     $opts = array_map('trim', explode(';', $ev['formats']));
     $ep = array_values(array_intersect($opts, (array)($in['epreuves'] ?? []))); if (!$ep) fail('Choisissez au moins une épreuve.');
     if ($pid) {
         $st = db()->prepare('SELECT * FROM participants WHERE id=? AND event_id=?'); $st->execute([$pid, $ev['id']]); $p = $st->fetch() ?: fail('Participant introuvable.', 404);
-        if (!$admin && $p['added_by'] !== $me) fail("Seul l'adhérent qui l'a ajouté peut modifier cette participation.", 403);
+        $mine = $me && ($p['added_by'] === $me || sameName($p['name'], $me));
+        if (!$admin && !$mine) fail("Vous ne pouvez modifier que vos participations ou celles que vous avez ajoutées.", 403);
+        if (!$admin && $p['added_by'] !== $me) $name = $p['name'];   // ajoutée par un tiers : seules les épreuves sont modifiables
         db()->prepare('UPDATE participants SET name=?,epreuves=? WHERE id=?')->execute([$name, json_encode($ep, JSON_UNESCAPED_UNICODE), $pid]);
     } else {
         db()->prepare('INSERT INTO participants (event_id,name,epreuves,added_by) VALUES (?,?,?,?)')->execute([$ev['id'], $name, json_encode($ep, JSON_UNESCAPED_UNICODE), $me ?? 'Admin']);
@@ -329,7 +370,7 @@ case 'part_save':
 
 case 'part_delete':
     $st = db()->prepare('SELECT * FROM participants WHERE id=?'); $st->execute([(int)($in['id'] ?? 0)]); $p = $st->fetch() ?: fail('Participant introuvable.', 404);
-    $mine = $me && ($p['added_by'] === $me || mb_strtolower(trim($p['name'])) === mb_strtolower($me));
+    $mine = $me && ($p['added_by'] === $me || sameName($p['name'], $me));
     if (!$admin && !$mine) fail("Vous ne pouvez supprimer que vos participations ou celles que vous avez ajoutées.", 403);
     db()->prepare('DELETE FROM participants WHERE id=?')->execute([$p['id']]); out(['ok' => true]);
 }

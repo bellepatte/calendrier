@@ -9,5 +9,6 @@ const DB_PASS = 'mot_de_passe_base';
 const GLOBAL_PASSWORD = 'changez-moi';   // mot de passe global : 12 caractères ou plus
 const ADMIN_CODE      = 'changez-moi-admin';  // code du mode admin (bouton « Mode admin »)
 const MAX_DESC        = 10000;
+const DB_PREFIX       = 'CALENDRIERCLUB_';   // préfixe des tables (optionnel : c'est la valeur par défaut)
 
 date_default_timezone_set('Europe/Paris');

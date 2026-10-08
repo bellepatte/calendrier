@@ -72,6 +72,9 @@ mark{background:#fde68a;border-radius:3px;padding:0 1px;color:inherit}
 .pg{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:10px}
 .pg ul{list-style:none;margin:8px 0 0;padding:0}.pg li{padding:7px 8px;border-radius:8px;cursor:pointer;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 @media(max-width:640px){.brand img{height:34px;max-width:150px}#results{padding:0 14px 40px}.sb{padding:0 14px}}
+.inb{position:absolute;top:8px;left:8px;background:#16a34a;color:#fff;font-weight:600;font-size:12px;padding:2px 9px;border-radius:99px}
+.inbi{background:#dcfce7;color:#166534;font-weight:600;font-size:12px;padding:1px 8px;border-radius:99px;white-space:nowrap}
+.prow.me{background:#f0fdf4;border-radius:8px;padding-left:8px;padding-right:8px}
 @media(max-width:1100px){#cols{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){#cols{grid-template-columns:1fr;padding:0 14px 40px}header{padding:10px 14px}.row2{grid-template-columns:1fr}.inl input{width:140px}}
 </style></head><body>
@@ -86,7 +89,7 @@ mark{background:#fde68a;border-radius:3px;padding:0 1px;color:inherit}
     <button onclick="nav(0)">Aujourd'hui</button><button id="add" class="pri" onclick="newEv()">Ajouter un événement</button>
   </div>
   <p id="info" class="info"></p>
-  <div class="sb"><input type="search" id="q" placeholder="🔍 Rechercher : participant, discipline, distance, épreuve, course, lieu…" aria-label="Rechercher" maxlength="60" autocomplete="off" oninput="qIn()" onkeydown="if(event.key==='Escape')qClear()"><button id="qx" onclick="qClear()" hidden>Effacer</button></div>
+  <div class="sb"><input type="search" id="q" placeholder="🔍 Rechercher : participant, discipline, distance, course, lieu, catégorie jeunes…" aria-label="Rechercher" maxlength="60" autocomplete="off" oninput="qIn()" onkeydown="if(event.key==='Escape')qClear()"><button id="qx" onclick="qClear()" hidden>Effacer</button></div>
   <section id="results" hidden></section>
   <main id="cols"></main>
 </div>
@@ -102,6 +105,10 @@ const ymd=s=>{const[a,b,c]=s.split('-');return new Date(+a,+b-1,+c)};
 const fmtS=s=>ymd(s).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
 const fmtL=s=>ymd(s).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 const can=e=>S.admin||(S.member&&e.creator===S.member);
+const nn=s=>fold(String(s).replace(/\s+/g,' ').trim());
+const isSelf=p=>!!S.member&&nn(p.name)===nn(S.member),isIn=e=>e.participants.some(isSelf);
+const delMsg=e=>{if(!e||S.admin)return'';const o=[...new Set(e.participants.filter(p=>p.added_by!==S.member).map(p=>p.added_by))];
+  return o.length?`Suppression impossible : des participations ont été ajoutées par d’autres adhérents (${o.join(', ')}). Seul un admin peut supprimer cet événement.`:''};
 const evById=id=>EV.find(x=>x.id===id)||SR.find(x=>x.id===id);
 const confirm2=m=>confirm(m)&&confirm('Dernière confirmation — '+m+'\nCette action est irréversible.');
 dlg.addEventListener('close',()=>cur=null);
@@ -129,7 +136,7 @@ function render(){$('#login').hidden=S.auth;$('#app').hidden=!S.auth;if(!S.auth)
   if(canAct())add.removeAttribute('aria-disabled');else add.setAttribute('aria-disabled','true');
   add.title=canAct()?'':HINT;
   $('#info').textContent=S.admin?'🔑 Mode admin : vous pouvez modifier et supprimer tous les éléments.'
-    :S.member?'👤 Vous pouvez modifier ou supprimer les événements que vous avez créés et les participations que vous avez ajoutées, et retirer votre propre participation. Les événements au liseré bleu sont ceux que vous pouvez modifier.'
+    :S.member?'👤 Vous pouvez modifier ou supprimer les événements que vous avez créés et les participations que vous avez ajoutées, et retirer votre propre participation. Les événements au liseré bleu sont ceux que vous pouvez modifier ; ceux marqués « ✓ Vous participez » sont ceux où votre nom figure parmi les participants.'
     :'🔒 Mode visiteur (consultation seule). Identifiez-vous pour ajouter des événements, des participations, et modifier ce qui vous concerne.'}
 async function act(a,d){try{S={...S,...await api(a,d)};render();if(S.auth){if(a.startsWith('logout')&&dlg.open)dlg.close();load()}}catch(e){alert(e.message)}}
 const mlog=f=>(act('login_member',{name:f.n.value}),false);
@@ -154,7 +161,7 @@ function draw(){
   $('#cols').innerHTML=h}
 const discs=e=>e.disciplines.map(d=>d.detail&&e.other?d.name+' : '+e.other:d.name);
 function card(e){const n=e.participants.length,tip=e.participants.map(p=>`${p.name} — ${p.epreuves.join(', ')}`).join('\n')||'Aucun participant';
-  return `<article class="card${can(e)?' mine':''}"${can(e)?' title="Vous pouvez modifier cet événement"':''} onclick="openEv(${e.id})"><div class="ph">${e.image?`<img src="${esc(e.image)}" alt="" loading="lazy" onerror="this.style.display='none'">`:''}${e.young.length?`<span class="yb" title="Ouvert aux jeunes : ${esc(e.young.map(y=>YNG[y]).join(', '))}">🧒 ${e.young.join(' · ')}</span>`:''}</div>
+  return `<article class="card${can(e)?' mine':''}"${can(e)?' title="Vous pouvez modifier cet événement"':''} onclick="openEv(${e.id})"><div class="ph">${isIn(e)?'<span class="inb">✓ Vous participez</span>':''}${e.image?`<img src="${esc(e.image)}" alt="" loading="lazy" onerror="this.style.display='none'">`:''}${e.young.length?`<span class="yb" title="Ouvert aux jeunes : ${esc(e.young.map(y=>YNG[y]).join(', '))}">🧒 ${e.young.join(' · ')}</span>`:''}</div>
   <div class="cb"><h3>${esc(e.name)}</h3><div class="mt">📅 ${fmtS(e.date)}${e.time?' à '+esc(e.time):''}</div><div class="mt">📍 ${esc(e.place)}</div>
   <div class="chips">${discs(e).map(d=>`<span class="chip">${esc(d)}</span>`).join('')}</div><div class="mt">🏁 ${esc(e.formats)}</div>
   <div class="ft"><span class="cnt" title="${esc(tip)}">👥 ${n} participant${n>1?'s':''}</span><button class="sm${offC()}"${offA()} onclick="event.stopPropagation();partForm(${e.id})">＋ Participer</button></div></div></article>`}
@@ -172,7 +179,7 @@ function formHtml(e){
   const v=e||{name:'',date:'',time:'',place:'',disciplines:[],other:'',site:'',image_url:'',formats:'',young:[],description:''};
   const mn=new Date();mn.setMonth(mn.getMonth()-1);const mx=new Date();mx.setFullYear(mx.getFullYear()+3);
   const lim=e?'':`min="${iso(mn)}" max="${iso(mx)}"`;
-  const blocked=e&&!S.admin&&e.participants.some(p=>p.added_by!==S.member);
+  const blocked=e?delMsg(e):'';
   return `<form onsubmit="return save(event,${e?e.id:0})">${e&&e.image?`<img class="dimg" src="${esc(e.image)}" alt="" onerror="this.style.display='none'">`:''}<h2 style="margin:0">${e?'Modifier l’événement':'Nouvel événement'}</h2>
   <label>Nom de l'événement *<input type="text" name="name" maxlength="50" required value="${esc(v.name)}"></label>
   <div class="row2"><label>Date *<input type="date" name="date" required ${lim} value="${esc(v.date)}"></label><label>Heure<input type="time" name="time" value="${esc(v.time)}"></label></div>
@@ -186,8 +193,8 @@ function formHtml(e){
   <label>Lien de l'image d'illustration<input type="url" name="image_url" maxlength="1024" placeholder="https://" value="${esc(v.image_url)}"></label>
   <div class="hint">Si vide : image du site officiel, sinon image par défaut selon la discipline.</div>
   <label>Description<textarea name="description" rows="6" maxlength="10000">${esc(v.description)}</textarea></label>
-  <div class="acts">${e?`<button type="button" class="dng" ${blocked?'disabled title="Des participations d’autres adhérents existent : seul un admin peut supprimer."':''} onclick="evDel(${e.id})">Supprimer</button>`:''}
-  <button type="button" onclick="dlg.close()">Annuler</button><button class="pri">${e?'Enregistrer les modifications':'Créer l’événement'}</button></div></form>`}
+  <div class="acts">${e?`<button type="button" class="dng${blocked?' off':''}"${blocked?` aria-disabled="true" title="${esc(blocked)}"`:''} onclick="evDel(${e.id})">Supprimer</button>`:''}
+  <button type="button" onclick="dlg.close()">Annuler</button><button class="pri">${e?'Enregistrer les modifications':'Créer l’événement'}</button></div>${blocked?`<p class="hint" style="text-align:right">⚠️ ${esc(blocked)}</p>`:''}</form>`}
 async function save(ev,id){ev.preventDefault();const fd=new FormData(ev.target),g=k=>(fd.get(k)||'').toString();
   const d={id,disciplines:fd.getAll('disc').map(Number),young:fd.getAll('young')};
   ['name','date','time','place','other','site','image_url','formats','description'].forEach(k=>d[k]=g(k));
@@ -200,19 +207,20 @@ async function save(ev,id){ev.preventDefault();const fd=new FormData(ev.target),
   if(id&&!confirm('Enregistrer les modifications ?'))return;
   const btn=ev.target.querySelector('.pri');btn.disabled=true;btn.textContent='Enregistrement…';
   try{await api('event_save',d);dlg.close();load()}catch(e){alert(e.message);btn.disabled=false;btn.textContent='Réessayer'}}
-async function evDel(id){if(!confirm2('Supprimer cet événement et toutes ses participations ?'))return;
+async function evDel(id){const m=delMsg(evById(id));if(m)return toast(m);if(!confirm2('Supprimer cet événement et toutes ses participations ?'))return;
   try{await api('event_delete',{id});dlg.close();load()}catch(e){alert(e.message)}}
 async function delMonth(m,lab){if(!confirm2(`Supprimer TOUS les événements de ${lab} ?`))return;
   try{const r=await api('month_delete',{month:m});alert(r.deleted+' événement(s) supprimé(s).');load()}catch(e){alert(e.message)}}
 
 function partsHtml(e){if(!e.id)return'';
-  const rows=e.participants.map(p=>{const own=S.admin||(S.member&&p.added_by===S.member),self=S.member&&p.name.trim().toLowerCase()===S.member.toLowerCase();
-    return `<div class="prow"><div><b>${esc(p.name)}</b><small>${esc(p.epreuves.join(' · '))} — ajouté par ${esc(p.added_by)}</small></div>${own||self?`<span>${own?`<button class="sm" onclick="partForm(${e.id},${p.id})" aria-label="Modifier">✏️</button> `:''}<button class="sm dng" onclick="partDel(${p.id})" aria-label="Supprimer">🗑</button></span>`:''}</div>`}).join('');
+  const rows=e.participants.map(p=>{const own=S.admin||(S.member&&p.added_by===S.member),self=isSelf(p);
+    return `<div class="prow${self?' me':''}"><div><b>${esc(p.name)}</b>${self?' <span class="inbi">vous</span>':''}<small>${esc(p.epreuves.join(' · '))} — ajouté par ${esc(p.added_by)}</small></div>${own||self?`<span><button class="sm" onclick="partForm(${e.id},${p.id})" aria-label="Modifier">✏️</button> <button class="sm dng" onclick="partDel(${p.id})" aria-label="Supprimer">🗑</button></span>`:''}</div>`}).join('');
   return `<section class="parts"><h3>Participants (${e.participants.length})<button class="sm${offC()}"${offA()} onclick="partForm(${e.id})">＋ Ajouter un participant</button></h3>${rows||'<p class="empty">Aucun participant pour le moment.</p>'}</section>`}
 function partForm(eid,pid){if(!canAct())return hint();const e=evById(eid),p=e.participants.find(x=>x.id===pid);
-  const opts=e.formats.split(';').map(s=>s.trim()).filter(Boolean);
+  const opts=e.formats.split(';').map(s=>s.trim()).filter(Boolean),lock=!!(p&&!S.admin&&p.added_by!==S.member);
   $('#d2c').innerHTML=`<form onsubmit="return partSave(event,${eid},${pid||0})"><h2 style="margin:0">${p?'Modifier la participation':'Ajouter un participant'}</h2>
-  <label>Nom du participant<input type="text" name="name" maxlength="100" required value="${esc(p?p.name:(S.member||''))}"></label>
+  <label>Nom du participant<input type="text" name="name" maxlength="100" required value="${esc(p?p.name:(S.member||''))}"${lock?' readonly':''}></label>
+  ${lock?`<div class="hint">Nom non modifiable : cette participation a été ajoutée par ${esc(p.added_by)}. Vous pouvez modifier les épreuves ou la supprimer.</div>`:''}
   <fieldset><legend>Épreuve(s) *</legend>${opts.map(o=>`<label class="ck"><input type="checkbox" name="ep" value="${esc(o)}" ${p&&p.epreuves.includes(o)?'checked':''}> ${esc(o)}</label>`).join('')}</fieldset>
   <div class="acts"><button type="button" onclick="dlg2.close()">Annuler</button><button class="pri">Enregistrer</button></div></form>`;dlg2.showModal()}
 async function partSave(ev,eid,id){ev.preventDefault();const fd=new FormData(ev.target),ep=fd.getAll('ep');
@@ -234,7 +242,7 @@ function qIn(){clearTimeout(qtm);const v=$('#q').value.trim();$('#qx').hidden=!$
 function qClear(){clearTimeout(qtm);Q='';SR=[];QT=[];$('#q').value='';$('#qx').hidden=true;$('#results').hidden=true;$('#cols').hidden=false}
 function resMsg(m){$('#cols').hidden=true;$('#results').hidden=false;$('#results').innerHTML=`<p class="empty">${esc(m)}</p>`}
 async function runSearch(reset){const q=Q;if(q.length<2)return;
-  const terms=[...new Set(q.split(/\s+/).filter(w=>w.length>=2).slice(0,5).map(fold))];
+  const terms=[...new Set(q.replace(/[eé]veil\s+athl[eé]tique/gi,'éveil').split(/\s+/).filter(w=>w.length>=2).slice(0,5).map(fold))];
   if(!terms.length)return resMsg('Saisissez au moins 2 caractères.');
   const r=await fetch('api.php?action=search&q='+encodeURIComponent(q));
   if(r.status===401){S.auth=false;return render()}
@@ -247,8 +255,9 @@ const matchP=p=>QT.some(t=>fold(p.name).includes(t)||fold(p.epreuves.join(' ')).
 function qTab(t){QTAB=t;drawRes()}
 function resRow(e){const d=ymd(e.date),past=e.date<iso(new Date()),hits=e.participants.filter(matchP),n=e.participants.length;
   return `<article class="rr${can(e)?' mine':''}" onclick="openEv(${e.id})"><div class="dt${past?' past':''}">${d.getDate()}<small>${d.toLocaleDateString('fr-FR',{month:'short'})} ${String(d.getFullYear()).slice(2)}</small></div>
-  <div><h3 style="margin:0;font-size:1rem">${hl(e.name)}</h3><div class="mt">📍 ${hl(e.place)}${e.time?' · '+esc(e.time):''}${past?' · terminé':''}</div>
+  <div><h3 style="margin:0;font-size:1rem">${hl(e.name)}${isIn(e)?' <span class="inbi">✓ Vous participez</span>':''}</h3><div class="mt">📍 ${hl(e.place)}${e.time?' · '+esc(e.time):''}${past?' · terminé':''}</div>
   <div class="chips">${discs(e).map(x=>`<span class="chip">${hl(x)}</span>`).join('')}</div><div class="mt">🏁 ${hl(e.formats)}</div>
+  ${e.young.length?`<div class="mt">🧒 ${hl('Ouvert aux jeunes')} : ${e.young.map(y=>hl(YNG[y]+' ('+y+')')).join(', ')}</div>`:''}
   ${hits.length?`<div class="hits">${hits.slice(0,4).map(p=>`<div>👤 ${hl(p.name)} <span class="mt">— ${p.epreuves.map(x=>hl(x)).join(', ')}</span></div>`).join('')}${hits.length>4?`<div class="mt">+ ${hits.length-4} autre(s)</div>`:''}</div>`:''}
   <div class="mt">👥 ${n} participant${n>1?'s':''}</div></div></article>`}
 function drawRes(){const el=$('#results');$('#cols').hidden=true;el.hidden=false;
