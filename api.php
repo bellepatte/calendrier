@@ -156,6 +156,18 @@ function getEvent(int $id): array {
     return $st->fetch() ?: fail('Événement introuvable.', 404);
 }
 
+function hydrate(array $rows): array {
+    $parts = []; $dis = [];
+    if ($rows) {
+        $ids = implode(',', array_map(fn($r) => (int)$r['id'], $rows));
+        foreach (db()->query("SELECT * FROM participants WHERE event_id IN ($ids) ORDER BY id") as $p)
+            $parts[$p['event_id']][] = ['id' => (int)$p['id'], 'name' => $p['name'], 'epreuves' => json_decode($p['epreuves'], true) ?: [], 'added_by' => $p['added_by']];
+        foreach (db()->query("SELECT ed.event_id, d.id, d.name, d.image, d.needs_detail FROM event_disciplines ed JOIN disciplines d ON d.id = ed.discipline_id WHERE ed.event_id IN ($ids) ORDER BY d.priority, d.id") as $d)
+            $dis[$d['event_id']][] = $d;
+    }
+    return array_map(fn($r) => shape($r, $parts[$r['id']] ?? [], $dis[$r['id']] ?? []), $rows);
+}
+
 // ---------- Anti brute force (par adresse IP, stocké en base) ----------
 const LOGIN_MAX_FAILS = 10;    // échecs autorisés avant blocage
 const LOGIN_LOCK_BASE = 900;   // 1er blocage : 15 min ; doublé à chaque échec suivant (plafond 24 h)
@@ -228,17 +240,31 @@ case 'events':
     $f = (string)($_GET['from'] ?? ''); $t = (string)($_GET['to'] ?? '');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $f) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $t)) fail('Période invalide.');
     $st = db()->prepare('SELECT * FROM events WHERE jour BETWEEN ? AND ? ORDER BY jour, heure IS NULL, heure, id');
-    $st->execute([$f, $t]); $rows = $st->fetchAll(); $parts = []; $dis = [];
-    if ($rows) {
-        $ids = implode(',', array_map(fn($r) => (int)$r['id'], $rows));
-        foreach (db()->query("SELECT * FROM participants WHERE event_id IN ($ids) ORDER BY id") as $p)
-            $parts[$p['event_id']][] = ['id' => (int)$p['id'], 'name' => $p['name'], 'epreuves' => json_decode($p['epreuves'], true) ?: [], 'added_by' => $p['added_by']];
-        foreach (db()->query("SELECT ed.event_id, d.id, d.name, d.image, d.needs_detail FROM event_disciplines ed JOIN disciplines d ON d.id = ed.discipline_id WHERE ed.event_id IN ($ids) ORDER BY d.priority, d.id") as $d)
-            $dis[$d['event_id']][] = $d;
-    }
+    $st->execute([$f, $t]);
     $dl = db()->query('SELECT id, name, needs_detail FROM disciplines ORDER BY priority, id')->fetchAll();
-    out(['events' => array_map(fn($r) => shape($r, $parts[$r['id']] ?? [], $dis[$r['id']] ?? []), $rows),
+    out(['events' => hydrate($st->fetchAll()),
          'disciplines' => array_map(fn($d) => ['id' => (int)$d['id'], 'name' => $d['name'], 'detail' => (bool)$d['needs_detail']], $dl)]);
+
+case 'search':
+    $q = ctl((string)($_GET['q'] ?? ''));
+    $terms = array_slice(array_values(array_filter(preg_split('/\s+/u', $q), fn($t) => mb_strlen($t) >= 2)), 0, 5);
+    if (!$terms || mb_strlen($q) > 60) fail('Saisissez au moins 2 caractères (60 maximum).');
+    $cond = []; $par = [];
+    foreach ($terms as $t) {
+        $a = '%' . addcslashes($t, '%_\\') . '%';                                          // texte libre
+        $b = '%' . addcslashes(str_replace([' ', '.'], ['', ','], $t), '%_\\') . '%';     // distances : "10.5km" = "10,5 km"
+        $cond[] = "(e.name LIKE ? COLLATE utf8mb4_unicode_ci OR e.place LIKE ? COLLATE utf8mb4_unicode_ci OR e.other LIKE ? COLLATE utf8mb4_unicode_ci
+            OR REPLACE(e.formats, ' ', '') LIKE ? COLLATE utf8mb4_unicode_ci
+            OR EXISTS (SELECT 1 FROM event_disciplines ed JOIN disciplines d ON d.id = ed.discipline_id WHERE ed.event_id = e.id AND d.name LIKE ? COLLATE utf8mb4_unicode_ci)
+            OR EXISTS (SELECT 1 FROM participants p WHERE p.event_id = e.id AND (p.name LIKE ? COLLATE utf8mb4_unicode_ci
+                 OR REPLACE(CAST(p.epreuves AS CHAR), ' ', '') LIKE ? COLLATE utf8mb4_unicode_ci)))";
+        array_push($par, $a, $a, $a, $b, $a, $a, $b);
+    }
+    $today = date('Y-m-d');
+    $st = db()->prepare('SELECT e.* FROM events e WHERE ' . implode(' AND ', $cond) . ' ORDER BY e.jour < ?, ABS(DATEDIFF(e.jour, ?)), e.id LIMIT 101');
+    $st->execute([...$par, $today, $today]); $rows = $st->fetchAll();
+    $trunc = count($rows) > 100; if ($trunc) array_pop($rows);
+    out(['events' => hydrate($rows), 'truncated' => $trunc]);
 
 case 'event_save':
     if (!$me && !$admin) fail('Connexion adhérent requise.', 403);

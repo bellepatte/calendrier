@@ -56,27 +56,45 @@ button.off{opacity:.45;cursor:not-allowed}button.off:hover{background:#fff}.pri.
 .grp{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.grp+.grp{padding-left:12px;border-left:1px solid var(--line)}
 .info{max-width:900px;margin:-6px auto 16px;padding:0 16px;text-align:center;color:var(--mute);font-size:13.5px}
 #toast{position:fixed;inset:auto auto 24px 50%;transform:translateX(-50%);margin:0;border:0;width:max-content;max-width:92vw;background:#17212b;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit}
+.brand img{height:44px;width:auto;max-width:220px;object-fit:contain;display:block}.lg{max-height:90px;max-width:80%;margin-bottom:10px}
+.card.mine,.rr.mine{border-left:5px solid #2563eb;border-color:#c3d5fb #c3d5fb #c3d5fb #2563eb}
+.sb{max-width:760px;margin:0 auto 16px;padding:0 16px;display:flex;gap:8px}.sb input{flex:1;padding:10px 16px;border-radius:99px}
+#results{padding:0 24px 48px;max-width:980px;margin:0 auto}
+.rs{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.tabs{display:flex;gap:6px}.tabs button.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.rr{display:grid;grid-template-columns:62px 1fr;gap:14px;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:10px;cursor:pointer}
+.rr:hover,.pg li:hover{box-shadow:0 6px 18px rgba(23,33,43,.09)}
+.dt{text-align:center;align-self:start;background:var(--pri2);color:var(--pri);border-radius:10px;padding:6px 0;font-weight:700;font-size:1.2rem;line-height:1.1}
+.dt small{display:block;font-weight:500;text-transform:uppercase;font-size:11px}.dt.past{background:#eef1f4;color:var(--mute)}
+mark{background:#fde68a;border-radius:3px;padding:0 1px;color:inherit}
+.hits{margin:6px 0;font-size:13.5px;background:var(--bg);border-radius:8px;padding:5px 9px}
+.pg{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:10px}
+.pg ul{list-style:none;margin:8px 0 0;padding:0}.pg li{padding:7px 8px;border-radius:8px;cursor:pointer;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+@media(max-width:640px){.brand img{height:34px;max-width:150px}#results{padding:0 14px 40px}.sb{padding:0 14px}}
 @media(max-width:1100px){#cols{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){#cols{grid-template-columns:1fr;padding:0 14px 40px}header{padding:10px 14px}.row2{grid-template-columns:1fr}.inl input{width:140px}}
 </style></head><body>
 <div id="login" hidden>
-  <h1>🏃 Calendrier du club</h1><p class="mt">Saisissez le mot de passe du club.</p>
+  <img class="lg" src="images/bannierelogo.png" alt="" onerror="this.style.display='none'"><h1>Calendrier du club</h1><p class="mt">Saisissez le mot de passe du club.</p>
   <form onsubmit="return glog(this)"><input type="password" name="p" placeholder="Mot de passe" required autofocus><div class="acts"><button class="pri" style="width:100%">Accéder au calendrier</button></div></form>
 </div>
 <div id="app" hidden>
-  <header><h1>🏃 Calendrier du club</h1><div id="auth"></div></header>
+  <header><div class="brand"><img src="images/bannierelogo.png" alt="Logo du club" onerror="this.style.display='none'"><h1>Calendrier du club</h1></div><div id="auth"></div></header>
   <div class="bar">
     <button onclick="nav(-1)" aria-label="Mois précédent">◀</button><span id="lbl"></span><button onclick="nav(1)" aria-label="Mois suivant">▶</button>
     <button onclick="nav(0)">Aujourd'hui</button><button id="add" class="pri" onclick="newEv()">Ajouter un événement</button>
   </div>
   <p id="info" class="info"></p>
+  <div class="sb"><input type="search" id="q" placeholder="🔍 Rechercher : participant, discipline, distance, épreuve, course, lieu…" aria-label="Rechercher" maxlength="60" autocomplete="off" oninput="qIn()" onkeydown="if(event.key==='Escape')qClear()"><button id="qx" onclick="qClear()" hidden>Effacer</button></div>
+  <section id="results" hidden></section>
   <main id="cols"></main>
 </div>
 <dialog id="dlg"><div class="dc"><button class="x" onclick="dlg.close()" aria-label="Fermer">✕</button><div id="dcc"></div></div></dialog>
 <dialog id="dlg2"><div class="dc" id="d2c"></div></dialog>
 <script>
 const YNG={EA:'Éveil Athlétique',PO:'Poussins',BE:'Benjamins',MI:'Minimes'};
-let S={},off=0,EV=[],DL=[],cur=null,BASE=new Date();
+let S={},off=0,EV=[],DL=[],SR=[],Q='',QT=[],QTAB='ev',TRUNC=false,qtm,cur=null,BASE=new Date();
 const $=s=>document.querySelector(s),dlg=$('#dlg'),dlg2=$('#dlg2');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -84,6 +102,7 @@ const ymd=s=>{const[a,b,c]=s.split('-');return new Date(+a,+b-1,+c)};
 const fmtS=s=>ymd(s).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
 const fmtL=s=>ymd(s).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 const can=e=>S.admin||(S.member&&e.creator===S.member);
+const evById=id=>EV.find(x=>x.id===id)||SR.find(x=>x.id===id);
 const confirm2=m=>confirm(m)&&confirm('Dernière confirmation — '+m+'\nCette action est irréversible.');
 dlg.addEventListener('close',()=>cur=null);
 [dlg,dlg2].forEach(d=>d.addEventListener('click',ev=>{if(ev.target===d)d.close()}));
@@ -110,12 +129,12 @@ function render(){$('#login').hidden=S.auth;$('#app').hidden=!S.auth;if(!S.auth)
   if(canAct())add.removeAttribute('aria-disabled');else add.setAttribute('aria-disabled','true');
   add.title=canAct()?'':HINT;
   $('#info').textContent=S.admin?'🔑 Mode admin : vous pouvez modifier et supprimer tous les éléments.'
-    :S.member?'👤 Vous pouvez modifier ou supprimer les événements que vous avez créés et les participations que vous avez ajoutées, et retirer votre propre participation.'
+    :S.member?'👤 Vous pouvez modifier ou supprimer les événements que vous avez créés et les participations que vous avez ajoutées, et retirer votre propre participation. Les événements au liseré bleu sont ceux que vous pouvez modifier.'
     :'🔒 Mode visiteur (consultation seule). Identifiez-vous pour ajouter des événements, des participations, et modifier ce qui vous concerne.'}
 async function act(a,d){try{S={...S,...await api(a,d)};render();if(S.auth){if(a.startsWith('logout')&&dlg.open)dlg.close();load()}}catch(e){alert(e.message)}}
 const mlog=f=>(act('login_member',{name:f.n.value}),false);
 const glog=f=>(act('login_global',{password:f.p.value}),false);
-function nav(n){off=n?off+n:0;load()}
+function nav(n){if(Q)qClear();off=n?off+n:0;load()}
 
 async function load(){
   const b=new Date();b.setDate(1);b.setMonth(b.getMonth()+off);BASE=b;
@@ -124,7 +143,8 @@ async function load(){
   if(r.status===401){S.auth=false;return render()}
   if(!r.ok)return alert((await r.json()).error||'Erreur de chargement');
   const j=await r.json();EV=j.events;DL=j.disciplines;draw();
-  if(cur){EV.some(x=>x.id===cur)?openEv(cur):dlg.close()}}
+  if(Q)await runSearch(false);
+  if(cur){evById(cur)?openEv(cur):dlg.close()}}
 function draw(){
   const f=d=>d.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
   $('#lbl').textContent=f(BASE)+' – '+f(new Date(BASE.getFullYear(),BASE.getMonth()+3,1));
@@ -134,12 +154,12 @@ function draw(){
   $('#cols').innerHTML=h}
 const discs=e=>e.disciplines.map(d=>d.detail&&e.other?d.name+' : '+e.other:d.name);
 function card(e){const n=e.participants.length,tip=e.participants.map(p=>`${p.name} — ${p.epreuves.join(', ')}`).join('\n')||'Aucun participant';
-  return `<article class="card" onclick="openEv(${e.id})"><div class="ph">${e.image?`<img src="${esc(e.image)}" alt="" loading="lazy" onerror="this.style.display='none'">`:''}${e.young.length?`<span class="yb" title="Ouvert aux jeunes : ${esc(e.young.map(y=>YNG[y]).join(', '))}">🧒 ${e.young.join(' · ')}</span>`:''}</div>
+  return `<article class="card${can(e)?' mine':''}"${can(e)?' title="Vous pouvez modifier cet événement"':''} onclick="openEv(${e.id})"><div class="ph">${e.image?`<img src="${esc(e.image)}" alt="" loading="lazy" onerror="this.style.display='none'">`:''}${e.young.length?`<span class="yb" title="Ouvert aux jeunes : ${esc(e.young.map(y=>YNG[y]).join(', '))}">🧒 ${e.young.join(' · ')}</span>`:''}</div>
   <div class="cb"><h3>${esc(e.name)}</h3><div class="mt">📅 ${fmtS(e.date)}${e.time?' à '+esc(e.time):''}</div><div class="mt">📍 ${esc(e.place)}</div>
   <div class="chips">${discs(e).map(d=>`<span class="chip">${esc(d)}</span>`).join('')}</div><div class="mt">🏁 ${esc(e.formats)}</div>
   <div class="ft"><span class="cnt" title="${esc(tip)}">👥 ${n} participant${n>1?'s':''}</span><button class="sm${offC()}"${offA()} onclick="event.stopPropagation();partForm(${e.id})">＋ Participer</button></div></div></article>`}
 
-function openEv(id){cur=id;const e=EV.find(x=>x.id===id);if(!e)return;
+function openEv(id){cur=id;const e=evById(id);if(!e)return;
   $('#dcc').innerHTML=(can(e)?formHtml(e):detailHtml(e))+partsHtml(e);if(!dlg.open)dlg.showModal()}
 function newEv(){if(!canAct())return hint();cur=null;$('#dcc').innerHTML=formHtml(null);if(!dlg.open)dlg.showModal()}
 function detailHtml(e){return `${e.image?`<img class="dimg" src="${esc(e.image)}" alt="" onerror="this.style.display='none'">`:''}<h2 style="margin:0">${esc(e.name)}</h2>
@@ -174,7 +194,7 @@ async function save(ev,id){ev.preventDefault();const fd=new FormData(ev.target),
   if(!d.disciplines.length)return alert('Choisissez au moins une discipline.');
   if([...ev.target.querySelectorAll('[name=disc]')].some(c=>c.checked&&c.dataset.detail==='1')&&!d.other.trim())return alert('Précisez la discipline.');
   const nf=normFmt(d.formats);if(nf.err)return alert(nf.err);
-  const old=id?EV.find(x=>x.id===id):null;
+  const old=id?evById(id):null;
   if(!old||old.date!==d.date){const mn=new Date();mn.setMonth(mn.getMonth()-1);const mx=new Date();mx.setFullYear(mx.getFullYear()+3);
     if(d.date<iso(mn)||d.date>iso(mx))return alert('Date hors limites : de 1 mois dans le passé à 3 ans dans le futur.')}
   if(id&&!confirm('Enregistrer les modifications ?'))return;
@@ -189,7 +209,7 @@ function partsHtml(e){if(!e.id)return'';
   const rows=e.participants.map(p=>{const own=S.admin||(S.member&&p.added_by===S.member),self=S.member&&p.name.trim().toLowerCase()===S.member.toLowerCase();
     return `<div class="prow"><div><b>${esc(p.name)}</b><small>${esc(p.epreuves.join(' · '))} — ajouté par ${esc(p.added_by)}</small></div>${own||self?`<span>${own?`<button class="sm" onclick="partForm(${e.id},${p.id})" aria-label="Modifier">✏️</button> `:''}<button class="sm dng" onclick="partDel(${p.id})" aria-label="Supprimer">🗑</button></span>`:''}</div>`}).join('');
   return `<section class="parts"><h3>Participants (${e.participants.length})<button class="sm${offC()}"${offA()} onclick="partForm(${e.id})">＋ Ajouter un participant</button></h3>${rows||'<p class="empty">Aucun participant pour le moment.</p>'}</section>`}
-function partForm(eid,pid){if(!canAct())return hint();const e=EV.find(x=>x.id===eid),p=e.participants.find(x=>x.id===pid);
+function partForm(eid,pid){if(!canAct())return hint();const e=evById(eid),p=e.participants.find(x=>x.id===pid);
   const opts=e.formats.split(';').map(s=>s.trim()).filter(Boolean);
   $('#d2c').innerHTML=`<form onsubmit="return partSave(event,${eid},${pid||0})"><h2 style="margin:0">${p?'Modifier la participation':'Ajouter un participant'}</h2>
   <label>Nom du participant<input type="text" name="name" maxlength="100" required value="${esc(p?p.name:(S.member||''))}"></label>
@@ -204,6 +224,42 @@ function adminForm(){$('#d2c').innerHTML=`<form onsubmit="return adminLog(event)
   <label>Code administrateur<input type="password" name="code" required autocomplete="off" autofocus></label>
   <div class="acts"><button type="button" onclick="dlg2.close()">Annuler</button><button class="pri">Activer</button></div></form>`;dlg2.showModal()}
 async function adminLog(ev){ev.preventDefault();try{S={...S,...await api('login_admin',{code:ev.target.code.value})};dlg2.close();render();load()}catch(e){alert(e.message)}}
+const fold=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+function hl(t){t=String(t??'');if(!QT.length)return esc(t);
+  const ch=[...t],f=ch.map(c=>{const x=fold(c);return x.length===1?x:'\0'}),mk=new Array(ch.length).fill(false);
+  for(const w of QT){const wc=[...w];for(let i=0;i+wc.length<=ch.length;i++){let ok=true;for(let k=0;k<wc.length;k++)if(f[i+k]!==wc[k]){ok=false;break}if(ok)for(let k=0;k<wc.length;k++)mk[i+k]=true}}
+  let o='',on=false;ch.forEach((c,i)=>{if(mk[i]&&!on){o+='<mark>';on=true}if(!mk[i]&&on){o+='</mark>';on=false}o+=esc(c)});return on?o+'</mark>':o}
+function qIn(){clearTimeout(qtm);const v=$('#q').value.trim();$('#qx').hidden=!$('#q').value;
+  if(!v){qClear();return}qtm=setTimeout(()=>{Q=v;runSearch(true)},300)}
+function qClear(){clearTimeout(qtm);Q='';SR=[];QT=[];$('#q').value='';$('#qx').hidden=true;$('#results').hidden=true;$('#cols').hidden=false}
+function resMsg(m){$('#cols').hidden=true;$('#results').hidden=false;$('#results').innerHTML=`<p class="empty">${esc(m)}</p>`}
+async function runSearch(reset){const q=Q;if(q.length<2)return;
+  const terms=[...new Set(q.split(/\s+/).filter(w=>w.length>=2).slice(0,5).map(fold))];
+  if(!terms.length)return resMsg('Saisissez au moins 2 caractères.');
+  const r=await fetch('api.php?action=search&q='+encodeURIComponent(q));
+  if(r.status===401){S.auth=false;return render()}
+  const j=await r.json().catch(()=>({error:'Réponse invalide'}));
+  if(q!==Q)return;
+  if(!r.ok)return resMsg(j.error||'Erreur de recherche');
+  SR=j.events;TRUNC=j.truncated;QT=[...new Set(terms.flatMap(t=>[t,t.replace(/\./g,',')]))];
+  if(reset)QTAB='ev';drawRes()}
+const matchP=p=>QT.some(t=>fold(p.name).includes(t)||fold(p.epreuves.join(' ')).includes(t));
+function qTab(t){QTAB=t;drawRes()}
+function resRow(e){const d=ymd(e.date),past=e.date<iso(new Date()),hits=e.participants.filter(matchP),n=e.participants.length;
+  return `<article class="rr${can(e)?' mine':''}" onclick="openEv(${e.id})"><div class="dt${past?' past':''}">${d.getDate()}<small>${d.toLocaleDateString('fr-FR',{month:'short'})} ${String(d.getFullYear()).slice(2)}</small></div>
+  <div><h3 style="margin:0;font-size:1rem">${hl(e.name)}</h3><div class="mt">📍 ${hl(e.place)}${e.time?' · '+esc(e.time):''}${past?' · terminé':''}</div>
+  <div class="chips">${discs(e).map(x=>`<span class="chip">${hl(x)}</span>`).join('')}</div><div class="mt">🏁 ${hl(e.formats)}</div>
+  ${hits.length?`<div class="hits">${hits.slice(0,4).map(p=>`<div>👤 ${hl(p.name)} <span class="mt">— ${p.epreuves.map(x=>hl(x)).join(', ')}</span></div>`).join('')}${hits.length>4?`<div class="mt">+ ${hits.length-4} autre(s)</div>`:''}</div>`:''}
+  <div class="mt">👥 ${n} participant${n>1?'s':''}</div></div></article>`}
+function drawRes(){const el=$('#results');$('#cols').hidden=true;el.hidden=false;
+  const pg=new Map();
+  SR.forEach(e=>e.participants.filter(matchP).forEach(p=>{const k=fold(p.name.trim());if(!pg.has(k))pg.set(k,{name:p.name,rows:[]});pg.get(k).rows.push({e,p})}));
+  const gr=[...pg.values()].sort((a,b)=>fold(a.name).localeCompare(fold(b.name))),s=SR.length>1?'s':'';
+  let b;
+  if(!SR.length)b='<p class="empty">Aucun résultat. Essayez un seul mot-clé (nom, lieu, discipline, distance…).</p>';
+  else if(QTAB==='ev')b=SR.map(resRow).join('');
+  else b=gr.length?gr.map(g=>`<div class="pg"><b>${hl(g.name)}</b> <small class="mt">${g.rows.length} participation${g.rows.length>1?'s':''}</small><ul>${g.rows.map(({e,p})=>`<li onclick="openEv(${e.id})"><span class="mt">📅 ${fmtS(e.date)}</span><span><b>${hl(e.name)}</b> — ${esc(e.place)}</span><span class="chips">${p.epreuves.map(x=>`<span class="chip">${hl(x)}</span>`).join('')}</span></li>`).join('')}</ul></div>`).join(''):'<p class="empty">Aucun participant ne correspond à cette recherche.</p>';
+  el.innerHTML=`<div class="rs"><b>${SR.length} événement${s} trouvé${s} pour « ${esc(Q)} »${TRUNC?' — 100 premiers résultats, affinez la recherche':''}</b><div class="tabs"><button class="${QTAB==='ev'?'on':''}" onclick="qTab('ev')">Événements (${SR.length})</button><button class="${QTAB==='pa'?'on':''}" onclick="qTab('pa')">Participants (${gr.length})</button></div></div>`+b}
 function togOther(f){f.other.hidden=![...f.querySelectorAll('[name=disc]')].some(c=>c.checked&&c.dataset.detail==='1')}
 function normFmt(raw){
   raw=raw.replace(/\s+/g,' ').replace(/^[ ;:]+|[ ;:]+$/g,'');
